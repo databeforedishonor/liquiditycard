@@ -38,7 +38,7 @@ export function TokenInput({
       </div>
       <div className="flex items-center gap-2">
         <Input
-          type="text"
+          type="number"
           placeholder={placeholder}
           value={value}
           onChange={(e) => onChange(e.target.value)}

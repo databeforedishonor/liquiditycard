@@ -1,5 +1,6 @@
 "use client"
 
+import { useRef, useEffect } from "react"
 import {  PlusIcon } from "lucide-react"
 import { TokenInput } from "./token-input"
 import { TokenSelector } from "./token-selector"
@@ -35,6 +36,9 @@ interface AddLiquidityTabProps {
   setSecondTokenAmount: (amount: string) => void
   setShowTokenList: (tokenIndex: number | null) => void
   handleTokenSelect: (token: token) => void
+  
+  // Callback to notify parent which field was last modified for quote handling
+  onFieldModified?: (field: 'first' | 'second') => void
 }
 
 export function AddLiquidityTab({
@@ -54,7 +58,40 @@ export function AddLiquidityTab({
   setSecondTokenAmount,
   setShowTokenList,
   handleTokenSelect,
+  onFieldModified,
 }: AddLiquidityTabProps) {
+  // Track which field was last modified
+  const lastModifiedField = useRef<'first' | 'second' | null>(null)
+
+  // Notify parent when field changes for proper quote handling
+  useEffect(() => {
+    if (lastModifiedField.current) {
+      onFieldModified?.(lastModifiedField.current)
+    }
+  }, [onFieldModified, lastModifiedField.current])
+
+  // Handler for first token amount
+  const handleFirstTokenAmountChange = (value: string) => {
+    lastModifiedField.current = 'first'
+    setFirstTokenAmount(value)
+    
+    // Clear the opposite field when user starts typing in this field
+    if (value && secondTokenAmount) {
+      setSecondTokenAmount('')
+    }
+  }
+
+  // Handler for second token amount  
+  const handleSecondTokenAmountChange = (value: string) => {
+    lastModifiedField.current = 'second'
+    setSecondTokenAmount(value)
+    
+    // Clear the opposite field when user starts typing in this field
+    if (value && firstTokenAmount) {
+      setFirstTokenAmount('')
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* First Token Input */}
@@ -64,7 +101,7 @@ export function AddLiquidityTab({
           value={firstTokenAmount}
           token={firstToken}
           balance={firstToken?.format(6)}
-          onChange={setFirstTokenAmount}
+          onChange={handleFirstTokenAmountChange}
           onTokenSelect={() => setShowTokenList(1)}
         />
         
@@ -89,7 +126,7 @@ export function AddLiquidityTab({
           value={secondTokenAmount}
           token={secondToken}
           balance={secondToken?.format(6)}
-          onChange={setSecondTokenAmount}
+          onChange={handleSecondTokenAmountChange}
           onTokenSelect={() => setShowTokenList(2)}
         />
         

@@ -9,8 +9,8 @@ import { useLiquidityAmounts } from "./hooks/use-liquidity-amounts"
 import { useWithdrawal } from "./hooks/use-withdrawal"
 import { useLiquidityActions } from "./hooks/use-liquidity-actions"
 import { hasLPTokens } from "@/lib/liquidity-utils"
+import { AddLiquidityForm } from "./forms/add-liquidity-form"
 import { 
-  AddLiquidityTab,
   WithdrawLiquidityTab,
   LoadingState,
   PairInfo
@@ -124,24 +124,7 @@ export default function LiquidityCard() {
 
         <CardContent className="space-y-4">
           <TabsContent value="add" className="mt-0 space-y-4">
-            <AddLiquidityTab
-              firstToken={firstToken}
-              secondToken={secondToken}
-              tokens={tokens}
-              firstTokenAmount={firstTokenAmount}
-              secondTokenAmount={secondTokenAmount}
-              showTokenList={showTokenList}
-              pairAddress={pairAddress}
-              quote={quote}
-              isQuoteLoading={isQuoteLoading}
-              quoteError={quoteError}
-              exchangeRate={exchangeRate}
-              poolShare={poolShare}
-              setFirstTokenAmount={setFirstTokenAmount}
-              setSecondTokenAmount={setSecondTokenAmount}
-              setShowTokenList={setShowTokenList}
-              handleTokenSelect={handleTokenSelect}
-            />
+            <AddLiquidityForm />
           </TabsContent>
 
           <TabsContent value="withdraw" className="mt-0 space-y-4">
@@ -166,16 +149,6 @@ export default function LiquidityCard() {
         </CardContent>
 
         <CardFooter>
-          <TabsContent value="add" className="mt-0 w-full">
-            <Button
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
-              disabled={!isValidAmounts || !firstToken || !secondToken}
-              onClick={handleAddLiquidity}
-            >
-              Add Liquidity
-            </Button>
-          </TabsContent>
-
           <TabsContent value="withdraw" className="mt-0 w-full">
             <Button
               className="w-full bg-rose-600 hover:bg-rose-700 text-white"

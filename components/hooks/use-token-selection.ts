@@ -184,12 +184,9 @@ export function useTokenSelection(): UseTokenSelectionReturn {
     isLoading: isFirstToSecondLoading,
     error: firstToSecondError,
   } = useQuote({
-    pairAddress: pairAddress || "",
-    inputAmount: firstTokenAmount || "0",
-    inputTokenAddress: updatedFirstToken?.tokenAddress.toString() || "",
-    outputTokenAddress: updatedSecondToken?.tokenAddress.toString() || "",
-    inputTokenDecimals: updatedFirstToken?.decimals || 18,
-    outputTokenDecimals: updatedSecondToken?.decimals || 18,
+    inputAmountA: firstTokenAmount || "0",
+    reserveA: reserves?.reserve0 || "0",
+    reserveB: reserves?.reserve1 || "0",
     enabled: hasValidQuoteParams && hasFirstAmount,
   })
 
@@ -199,12 +196,9 @@ export function useTokenSelection(): UseTokenSelectionReturn {
     isLoading: isSecondToFirstLoading,
     error: secondToFirstError,
   } = useQuote({
-    pairAddress: pairAddress || "",
-    inputAmount: secondTokenAmount || "0",
-    inputTokenAddress: updatedSecondToken?.tokenAddress.toString() || "",
-    outputTokenAddress: updatedFirstToken?.tokenAddress.toString() || "",
-    inputTokenDecimals: updatedSecondToken?.decimals || 18,
-    outputTokenDecimals: updatedFirstToken?.decimals || 18,
+    inputAmountA: secondTokenAmount || "0",
+    reserveA: reserves?.reserve0 || "0",
+    reserveB: reserves?.reserve1 || "0",
     enabled: hasValidQuoteParams && hasSecondAmount,
   })
 
@@ -247,8 +241,14 @@ export function useTokenSelection(): UseTokenSelectionReturn {
   const handleTokenSelect = (selectedToken: token) => {
     if (showTokenList === 1) {
       setFirstToken(selectedToken)
+      // Clear amounts when first token changes
+      setFirstTokenAmount("")
+      setSecondTokenAmount("")
     } else if (showTokenList === 2) {
       setSecondToken(selectedToken)
+      // Clear amounts when second token changes
+      setFirstTokenAmount("")
+      setSecondTokenAmount("")
     }
     setShowTokenList(null)
   }

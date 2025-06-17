@@ -1,7 +1,7 @@
 ---
 description: 
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 # TanStack Form Usage Rules (Context7)
 
@@ -89,4 +89,549 @@ export function LoginForm() {
 - [Best Practices](mdc:best-practices.mdc)
 - [Naming Conventions](mdc:naming.mdc)
 - [Project Structure](mdc:structure.mdc)
+
+# TanStack Form Best Practices
+
+## Core Principles
+
+### Form Creation
+- Use `useForm` for one-off forms or `createFormHook` for reusable form patterns
+- Always define `defaultValues` with proper TypeScript types
+- Use `formOptions` to create shareable form configurations across multiple forms
+
+```typescript
+// Preferred: Reusable form options
+const formOpts = formOptions({
+  defaultValues: {
+    firstName: '',
+    lastName: '',
+    email: '',
+  },
+})
+
+const form = useForm({
+  ...formOpts,
+  onSubmit: async ({ value }) => {
+    // Handle submission
+  },
+})
+```
+
+### Field Implementation
+- Use `form.Field` with render props pattern for maximum flexibility
+- Always bind `field.state.value`, `field.handleChange`, and `field.handleBlur`
+- Use `children` prop with render function for proper type inference
+
+```typescript
+<form.Field
+  name="firstName"
+  validators={{
+    onChange: ({ value }) => 
+      !value ? 'Required' : value.length < 2 ? 'Too short' : undefined,
+  }}
+  children={(field) => (
+    <>
+      <input
+        name={field.name}
+        value={field.state.value}
+        onBlur={field.handleBlur}
+        onChange={(e) => field.handleChange(e.target.value)}
+      />
+      {!field.state.meta.isValid && (
+        <em>{field.state.meta.errors.join(', ')}</em>
+      )}
+    </>
+  )}
+/>
+```
+
+## Validation Patterns
+
+### Synchronous Validation
+```typescript
+validators={{
+  onChange: ({ value }) => 
+    !value ? 'Required' : undefined,
+  onBlur: ({ value }) => 
+    value.length < 3 ? 'Must be at least 3 characters' : undefined,
+}}
+```
+
+### Asynchronous Validation
+```typescript
+validators={{
+  onChangeAsync: async ({ value }) => {
+    await new Promise(resolve => setTimeout(resolve, 500))
+    return value.includes('error') ? 'Invalid value' : undefined
+  },
+  onChangeAsyncDebounceMs: 500,
+}}
+```
+
+### Schema Validation (Zod/Valibot)
+```typescript
+import { z } from 'zod'
+
+const userSchema = z.object({
+  email: z.string().email(),
+  age: z.number().min(13),
+})
+
+const form = useForm({
+  defaultValues: { email: '', age: 0 },
+  validators: {
+    onChange: userSchema,
+  },
+})
+```
+
+## Reactivity & State Management
+
+TanStack Form doesn't cause re-renders when interacting with the form. For reactive values, use one of two subscription methods:
+
+### 1. useStore Hook
+Perfect for accessing form values within component logic. ALWAYS use a selector to prevent unnecessary re-renders.
+
+```typescript
+import { useStore } from '@tanstack/react-form'
+
+// ✅ Good: With selector
+const firstName = useStore(form.store, (state) => state.values.firstName)
+const errors = useStore(form.store, (state) => state.errorMap)
+const isValid = useStore(form.store, (state) => state.isValid)
+
+// ❌ Bad: Without selector (causes unnecessary re-renders)
+const wholeState = useStore(form.store) // Don't do this!
+```
+
+**When to use useStore:**
+- Accessing form values in component logic
+- Conditional rendering based on form state
+- Using field values in calculations or API calls
+- Any reactive value needed outside of JSX rendering
+
+### 2. form.Subscribe Component
+Optimized for UI reactivity with no component-level re-renders. Only the Subscribe component re-renders when subscribed values change.
+
+```typescript
+// ✅ Best for UI reactivity
+<form.Subscribe
+  selector={(state) => state.values.firstName}
+  children={(firstName) => (
+    <div>Hello, {firstName}!</div>
+  )}
+/>
+
+// ✅ Multiple values with array selector
+<form.Subscribe
+  selector={(state) => [state.canSubmit, state.isSubmitting]}
+  children={([canSubmit, isSubmitting]) => (
+    <button type="submit" disabled={!canSubmit}>
+      {isSubmitting ? 'Submitting...' : 'Submit'}
+    </button>
+  )}
+/>
+
+// ✅ Complex state selection
+<form.Subscribe
+  selector={(state) => ({
+    hasErrors: !state.isValid,
+    errorCount: Object.keys(state.errorMap).length,
+    isDirty: state.isDirty
+  })}
+  children={({ hasErrors, errorCount, isDirty }) => (
+    <div>
+      {hasErrors && <span>Errors: {errorCount}</span>}
+      {isDirty && <span>Form has changes</span>}
+    </div>
+  )}
+/>
+```
+
+**When to use form.Subscribe:**
+- Showing/hiding UI based on form state
+- Displaying form status or progress
+- Conditional rendering in JSX
+- Any reactive UI that should optimize re-renders
+
+## Listeners & Side Effects
+
+Use listeners for side effects triggered by form events. Available events: `onChange`, `onBlur`, `onMount`, `onSubmit`.
+
+### Field-Level Listeners
+Perfect for resetting dependent fields or triggering related actions:
+
+```typescript
+<form.Field
+  name="country"
+  listeners={{
+    onChange: ({ value, fieldApi }) => {
+      console.log(`Country changed to: ${value}`)
+      // Reset dependent field when country changes
+      form.setFieldValue('province', '')
+      form.setFieldValue('city', '')
+    },
+    onBlur: ({ value }) => {
+      // Trigger analytics or logging
+      analytics.track('field_blur', { field: 'country', value })
+    },
+  }}
+>
+  {(field) => (
+    <select
+      value={field.state.value}
+      onChange={(e) => field.handleChange(e.target.value)}
+      onBlur={field.handleBlur}
+    >
+      <option value="">Select Country</option>
+      <option value="US">United States</option>
+      <option value="CA">Canada</option>
+    </select>
+  )}
+</form.Field>
+
+<form.Field name="province">
+  {(field) => (
+    <input
+      placeholder="Province/State"
+      value={field.state.value}
+      onChange={(e) => field.handleChange(e.target.value)}
+    />
+  )}
+</form.Field>
+```
+
+### Built-in Debouncing
+Debounce API calls and expensive operations in listeners:
+
+```typescript
+<form.Field
+  name="username"
+  listeners={{
+    onChangeDebounceMs: 500, // 500ms debounce
+    onChange: async ({ value }) => {
+      if (value.length >= 3) {
+        // Check username availability
+        const isAvailable = await checkUsernameAvailability(value)
+        if (!isAvailable) {
+          // Set custom error or update UI
+          form.setFieldMeta('username', (prev) => ({
+            ...prev,
+            errorMap: { onServer: 'Username not available' }
+          }))
+        }
+      }
+    },
+    onBlurDebounceMs: 300,
+    onBlur: ({ value }) => {
+      // Debounced blur handler
+      saveFormProgress({ username: value })
+    },
+  }}
+>
+  {(field) => (
+    <input
+      value={field.state.value}
+      onChange={(e) => field.handleChange(e.target.value)}
+      onBlur={field.handleBlur}
+    />
+  )}
+</form.Field>
+```
+
+### Form-Level Listeners
+Global listeners that apply to all fields or form-wide events:
+
+```typescript
+const form = useForm({
+  defaultValues: { /* ... */ },
+  listeners: {
+    onMount: ({ formApi }) => {
+      // Initialize form when mounted
+      analytics.track('form_mounted', { formType: 'registration' })
+      
+      // Load saved progress
+      const savedData = loadFormProgress()
+      if (savedData) {
+        formApi.setValues(savedData)
+      }
+    },
+    
+    onSubmit: ({ formApi }) => {
+      // Global form submission tracking
+      analytics.track('form_submitted', {
+        formType: 'registration',
+        values: formApi.state.values
+      })
+    },
+    
+    onChange: ({ formApi, fieldApi }) => {
+      // Auto-save on any field change
+      if (formApi.state.isValid) {
+        debouncedAutoSave(formApi.state.values)
+      }
+      
+      // fieldApi represents the field that triggered the event
+      console.log(`Field ${fieldApi.name} changed to:`, fieldApi.state.value)
+    },
+    onChangeDebounceMs: 1000, // Debounce auto-save
+    
+    onBlur: ({ formApi, fieldApi }) => {
+      // Track field interactions
+      analytics.track('field_blur', {
+        field: fieldApi.name,
+        value: fieldApi.state.value,
+        formProgress: calculateFormProgress(formApi.state.values)
+      })
+    },
+  },
+})
+```
+
+### Practical Use Cases
+
+#### 1. Dependent Field Reset
+```typescript
+// Reset city when state changes
+<form.Field
+  name="state"
+  listeners={{
+    onChange: () => {
+      form.setFieldValue('city', '')
+      form.setFieldValue('zipCode', '')
+    },
+  }}
+/>
+```
+
+#### 2. Real-time Validation
+```typescript
+// Check email availability
+<form.Field
+  name="email"
+  listeners={{
+    onChangeDebounceMs: 500,
+    onChange: async ({ value }) => {
+      if (isValidEmail(value)) {
+        const exists = await checkEmailExists(value)
+        if (exists) {
+          form.setFieldValue('emailError', 'Email already registered')
+        } else {
+          form.setFieldValue('emailError', '')
+        }
+      }
+    },
+  }}
+/>
+```
+
+#### 3. Form Progress Tracking
+```typescript
+// Auto-save and progress tracking
+const form = useForm({
+  listeners: {
+    onChangeDebounceMs: 2000,
+    onChange: ({ formApi }) => {
+      const progress = calculateProgress(formApi.state.values)
+      saveFormProgress(formApi.state.values)
+      updateProgressBar(progress)
+    },
+  },
+})
+```
+
+### Field State Properties
+- `isTouched`: After user changes or blurs field
+- `isDirty`: After field value changes (persistent)
+- `isPristine`: Until user changes field value
+- `isBlurred`: After field has been blurred
+- `isDefaultValue`: Whether current value equals default
+
+## Form Composition & Reusability
+
+### Custom Form Hooks
+```typescript
+import { createFormHookContexts, createFormHook } from '@tanstack/react-form'
+
+const { fieldContext, formContext, useFieldContext } = createFormHookContexts()
+
+const { useAppForm } = createFormHook({
+  fieldContext,
+  formContext,
+  fieldComponents: {
+    TextField,
+    NumberField,
+  },
+  formComponents: {
+    SubmitButton,
+  },
+})
+```
+
+### Pre-bound Field Components
+```typescript
+function TextField({ label }: { label: string }) {
+  const field = useFieldContext<string>()
+  return (
+    <label>
+      <div>{label}</div>
+      <input
+        value={field.state.value}
+        onChange={(e) => field.handleChange(e.target.value)}
+        onBlur={field.handleBlur}
+      />
+      {!field.state.meta.isValid && (
+        <em>{field.state.meta.errors.join(', ')}</em>
+      )}
+    </label>
+  )
+}
+```
+
+## Array Fields
+
+### Implementation Pattern
+```typescript
+<form.Field
+  name="hobbies"
+  mode="array"
+  children={(hobbiesField) => (
+    <div>
+      {hobbiesField.state.value.map((_, i) => (
+        <div key={i}>
+          <form.Field
+            name={`hobbies[${i}].name`}
+            children={(field) => (
+              <input
+                value={field.state.value}
+                onChange={(e) => field.handleChange(e.target.value)}
+              />
+            )}
+          />
+          <button onClick={() => hobbiesField.removeValue(i)}>
+            Remove
+          </button>
+        </div>
+      ))}
+      <button onClick={() => hobbiesField.pushValue({ name: '' })}>
+        Add Hobby
+      </button>
+    </div>
+  )}
+/>
+```
+
+## Form Submission
+
+### Standard Pattern
+```typescript
+<form
+  onSubmit={(e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    form.handleSubmit()
+  }}
+>
+  {/* form fields */}
+</form>
+```
+
+### Reset Handling
+```typescript
+// ✅ Prevent default HTML reset behavior
+<button
+  type="reset"
+  onClick={(event) => {
+    event.preventDefault()
+    form.reset()
+  }}
+>
+  Reset
+</button>
+
+// ✅ Alternative: Use button type="button"
+<button type="button" onClick={() => form.reset()}>
+  Reset
+</button>
+```
+
+## Performance Optimization
+
+### Selective Subscriptions
+- Always use selectors in `form.Subscribe` and `useStore`
+- Avoid accessing entire form state when only specific values are needed
+- Use field-level subscriptions for field-specific state
+
+### Component Composition
+- Extract reusable field components
+- Use `createFormHook` for consistent form patterns
+- Leverage `withForm` HOC for breaking large forms into smaller pieces
+
+## TypeScript Requirements
+
+### Strict Configuration
+- Requires `strict: true` in tsconfig.json
+- TypeScript v5.4 or greater
+- Lock package version to specific patch for stable types
+
+### Type Safety Best Practices
+- Define explicit interfaces for form values
+- Use proper generic constraints for custom components
+- Leverage type inference from `defaultValues`
+
+```typescript
+interface UserForm {
+  firstName: string
+  lastName: string
+  email: string
+  age: number
+}
+
+const form = useForm<UserForm>({
+  defaultValues: {
+    firstName: '',
+    lastName: '',
+    email: '',
+    age: 0,
+  },
+})
+```
+
+## Integration Patterns
+
+### With TanStack Query
+```typescript
+const form = useForm({
+  defaultValues: initialData,
+  onSubmit: async ({ value }) => {
+    await submitMutation.mutateAsync(value)
+  },
+})
+```
+
+### With UI Libraries
+- Create wrapper components for consistent styling
+- Use `createFormHook` to bind UI library components
+- Maintain accessibility through proper form semantics
+
+## Common Anti-Patterns to Avoid
+
+### ❌ Don't
+- Use `useField` hook outside of `form.Field` context
+- Access form state without selectors in `useStore`
+- Manually manage field state outside of TanStack Form
+- Use uncontrolled components with TanStack Form
+- Forget to call `e.preventDefault()` in form submission
+- Use listeners for UI reactivity (use `form.Subscribe` instead)
+- Make API calls in listeners without debouncing
+
+### ✅ Do
+- Use render props pattern for field components
+- Implement proper validation at appropriate lifecycle events
+- Use selectors for state subscriptions
+- Follow the composition patterns for reusable forms
+- Handle async validation with proper debouncing
+- Use `form.Subscribe` for UI reactivity, `useStore` for logic
+- Implement proper cleanup in listeners
+- Use debouncing for expensive operations in listeners
 
