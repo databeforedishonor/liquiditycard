@@ -1,12 +1,11 @@
 "use client"
 
-import { ArrowDown } from "lucide-react"
+import {  PlusIcon } from "lucide-react"
 import { TokenInput } from "./token-input"
 import { TokenSelector } from "./token-selector"
 import { QuoteDisplay } from "./quote-display"
 import { ExchangeRateDisplay } from "./exchange-rate-display"
 import type { token } from "@/types/token"
-import { Token } from "@vechain/sdk-core"
 
 interface AddLiquidityTabProps {
   // Token data
@@ -79,7 +78,7 @@ export function AddLiquidityTab({
 
       <div className="flex justify-center">
         <div className="bg-gray-100 p-1 rounded-full">
-          <ArrowDown className="h-5 w-5 text-gray-500" />
+          <PlusIcon className="h-5 w-5 text-gray-500" />
         </div>
       </div>
 

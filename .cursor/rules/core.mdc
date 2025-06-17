@@ -1,0 +1,67 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Core Development Principles (Context7-aligned)
+
+## Architecture
+- Use Next.js App Router and file-based routing ([Next.js Context7](mdc:https:/context7.com/vercel/next.js)).
+- Prefer Server Components for static/non-interactive UI.
+- Use Client Components only for interactivity or browser APIs.
+- Keep component tree shallow and composable.
+- Follow unidirectional data flow patterns.
+- Separate UI, logic, and data layers.
+
+## Component Design
+- Use functional React components and hooks ([React Context7](mdc:https:/context7.com/reactjs/react.dev)).
+- Prefer composition and slot-based APIs (shadcn/ui).
+- Extract reusable logic to custom hooks.
+- Use atomic/component-driven design.
+
+## Type Safety
+- Use TypeScript with strict mode enabled.
+- Define explicit interfaces for component props.
+- Use Drizzle ORM for type-safe SQL and migrations.
+- Validate runtime data with Zod.
+
+## Performance
+- Use code splitting and dynamic imports.
+- Memoize components and hooks.
+- Use virtualization for long lists.
+- Monitor and improve Core Web Vitals.
+
+## Accessibility
+- Use semantic HTML and ARIA attributes.
+- Ensure color contrast and keyboard navigation.
+- Follow accessibility guidance in shadcn/ui and TailwindCSS docs.
+
+## Error Handling
+- Use error boundaries for robust error handling.
+- Handle async errors gracefully.
+- Provide meaningful error messages and fallback UI.
+
+## Security
+- Sanitize user inputs.
+- Use HTTPS for all communications.
+- Store secrets in environment variables.
+- Implement proper authentication and authorization.
+
+## Internationalization
+- Use i18n libraries/frameworks.
+- Support RTL languages when necessary.
+- Use translation keys, not hardcoded strings.
+
+## Optimization
+- Use lazy loading for non-critical resources.
+- Use TanStack Query for server state ([TanStack Context7](mdc:https:/context7.com/tanstack/tanstack.com)).
+- Optimize bundle size and critical rendering path.
+
+---
+
+**References:**
+- [Next.js Context7](mdc:https:/context7.com/vercel/next.js)
+- [React Context7](mdc:https:/context7.com/reactjs/react.dev)
+- [TailwindCSS Context7](mdc:https:/context7.com/tailwindlabs/tailwindcss.com)
+- [shadcn/ui Context7](mdc:https:/context7.com/shadcn-ui/ui)
+- [TanStack Context7](mdc:https:/context7.com/tanstack/tanstack.com)

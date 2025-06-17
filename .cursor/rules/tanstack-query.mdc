@@ -1,0 +1,95 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# TanStack Query Usage Rules (Context7)
+
+## Overview
+TanStack Query is the standard for all server state management in this codebase. Follow these rules for consistent, maintainable, and high-performance data fetching and mutation.
+
+## Key Principles
+- Use TanStack Query for all server state (remote data, async APIs, blockchain reads, etc.)
+- Co-locate query/mutation logic with feature logic (see [Project Structure Guidelines](mdc:structure.mdc))
+- Prefer React Server Components for static/non-interactive UI; use Client Components only for interactivity
+- Always use TypeScript with strict types for query/mutation params and results
+- Reference: [TanStack Context7](mdc:https:/context7.com/tanstack/tanstack.com)
+
+## File & Directory Organization
+- Place query/mutation functions in `lib/queries/` (see [structure.mdc](mdc:structure.mdc))
+- Name files and exports by resource: `users.ts` → `getUser`, `useUserQuery`, `updateUser`, `useUpdateUserMutation`
+- Use barrel files (`index.ts`) for clean imports
+- Co-locate tests with query files using `.test.ts` suffix
+
+## Naming Conventions
+- Query keys: Use descriptive arrays, e.g., `['users', userId]`
+- Query functions: Prefix with `get`/`fetch`/`update`, e.g., `getUser`, `updateUser`
+- Query hooks: Prefix with `use`, e.g., `useUserQuery`, `useProductsQuery`
+- See [naming.mdc](mdc:naming.mdc) for more
+
+## Usage Patterns
+### Queries
+```typescript
+import { useQuery } from '@tanstack/react-query';
+
+function getUser(userId: string): Promise<User> {
+  // ...fetch logic
+}
+
+export function useUserQuery(userId: string) {
+  return useQuery({
+    queryKey: ['users', userId],
+    queryFn: () => getUser(userId),
+    enabled: !!userId,
+  });
+}
+```
+
+### Mutations
+```typescript
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+
+function updateUser(user: User): Promise<User> {
+  // ...update logic
+}
+
+export function useUpdateUserMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: updateUser,
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['users', variables.id] });
+    },
+  });
+}
+```
+
+### Query Invalidation & Caching
+- Always invalidate or refetch relevant queries after mutations
+- Use `queryClient.invalidateQueries` with descriptive keys
+- Use optimistic updates for fast UX when appropriate
+
+### Error & Loading States
+- Always handle `isLoading`, `isError`, and `data` in UI
+- Show skeletons/loaders for loading states
+- Display user-friendly error messages
+
+### SSR/Next.js Integration
+- Use React Server Components for static data
+- Use TanStack Query in Client Components for dynamic/interactive data
+- Use `dehydrate`/`Hydrate` for SSR/SSG if needed
+- Never fetch data in `useEffect`—always use TanStack Query
+
+## Testing
+- Mock server responses in tests
+- Test loading, error, and success states
+- Co-locate tests with query/mutation files
+
+## References
+- [TanStack Context7](mdc:https:/context7.com/tanstack/tanstack.com)
+- [Best Practices](mdc:best-practices.mdc)
+- [Naming Conventions](mdc:naming.mdc)
+- [Project Structure](mdc:structure.mdc)
+
+
+

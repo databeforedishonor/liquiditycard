@@ -1,5 +1,17 @@
 import { useState, useMemo } from "react"
+import { useWallet } from "@vechain/dapp-kit-react"
 import { token } from "@/types/token"
+import { useGetPairAddress } from "./chain/use-get-pair-address"
+import { useGetPairTokens } from "./chain/use-get-pair-tokens"
+import { useLPTokenBalance } from "./chain/use-lp-token-balance"
+import { usePairReserves } from "./chain/use-pair-reserves"
+import { usePairTotalSupply } from "./chain/use-pair-total-supply"
+import { 
+  calculateWithdrawalAmounts, 
+  formatLPTokenBalance, 
+  formatTokenAmount,
+  hasLPTokens 
+} from "@/lib/liquidity-utils"
 
 interface LPToken {
   symbol: string
@@ -15,6 +27,8 @@ interface UseWithdrawalReturn {
   estimatedFirstTokenAmount: string
   estimatedSecondTokenAmount: string
   lpToken: LPToken
+  isLoading: boolean
+  error: Error | null
 }
 
 interface UseWithdrawalProps {
@@ -26,9 +40,68 @@ export function useWithdrawal({
   firstToken, 
   secondToken 
 }: UseWithdrawalProps): UseWithdrawalReturn {
+  const { account } = useWallet()
   const [withdrawPercentage, setWithdrawPercentage] = useState(50)
 
-  // Mock LP token data - in real app, this would come from contract queries
+  // Get pair address for the token pair
+  const {
+    pairAddress,
+    isLoading: isPairLoading,
+    error: pairError,
+  } = useGetPairAddress(
+    firstToken?.tokenAddress.toString() || "",
+    secondToken?.tokenAddress.toString() || "",
+    Boolean(firstToken && secondToken)
+  )
+
+  // Get pair tokens to determine correct token order
+  const {
+    tokens: pairTokens,
+    isLoading: isPairTokensLoading,
+    error: pairTokensError,
+  } = useGetPairTokens(
+    pairAddress || "",
+    Boolean(pairAddress)
+  )
+
+  // Get LP token balance for the user
+  const {
+    balance: lpTokenBalance,
+    isLoading: isLPBalanceLoading,
+    error: lpBalanceError,
+  } = useLPTokenBalance({
+    pairAddress: pairAddress || "",
+    userAddress: account || "",
+    enabled: Boolean(pairAddress && account),
+  })
+
+  // Get pair reserves
+  const {
+    call: reserves,
+    isLoading: isReservesLoading,
+    error: reservesError,
+  } = usePairReserves(
+    pairAddress || "",
+    Boolean(pairAddress)
+  )
+
+  // Get pair total supply
+  const {
+    totalSupply,
+    isLoading: isTotalSupplyLoading,
+    error: totalSupplyError,
+  } = usePairTotalSupply(
+    pairAddress || "",
+    Boolean(pairAddress)
+  )
+
+  // Combine loading states
+  const isLoading = isPairLoading || isPairTokensLoading || isLPBalanceLoading || isReservesLoading || isTotalSupplyLoading
+
+  // Combine error states
+  const error = pairError || pairTokensError || lpBalanceError || reservesError || totalSupplyError
+
+  // Create LP token info
   const lpToken = useMemo((): LPToken => {
     if (!firstToken || !secondToken) {
       return {
@@ -40,35 +113,50 @@ export function useWithdrawal({
       }
     }
 
-    // Mock logic: For demo purposes, you can change this to "0.0000" to test the no LP tokens state
-    // In a real app, this would come from blockchain queries
-    const mockHasLPTokens = true // Set to false to test no LP tokens state
+    const formattedBalance = formatLPTokenBalance(lpTokenBalance)
+    const hasTokens = hasLPTokens(lpTokenBalance)
     
     return {
       symbol: `${firstToken.symbol}-${secondToken.symbol} LP`,
-      balance: mockHasLPTokens ? "0.0245" : "0.0000",
-      value: mockHasLPTokens ? "$84.23" : "$0.00",
+      balance: formattedBalance,
+      value: hasTokens ? "$0.00" : "$0.00", // TODO: Calculate USD value if needed
       token0: firstToken,
       token1: secondToken,
     }
-  }, [firstToken, secondToken])
+  }, [firstToken, secondToken, lpTokenBalance])
 
   // Calculate estimated token amounts based on withdrawal percentage
+  const withdrawalAmounts = useMemo(() => {
+    if (!reserves || !totalSupply || !lpTokenBalance) {
+      return { amount0: "0", amount1: "0" }
+    }
+
+    return calculateWithdrawalAmounts(
+      lpTokenBalance,
+      totalSupply,
+      reserves.reserve0,
+      reserves.reserve1,
+      withdrawPercentage
+    )
+  }, [lpTokenBalance, totalSupply, reserves, withdrawPercentage])
+
   const estimatedFirstTokenAmount = useMemo(() => {
-    if (!firstToken) return "0.000000"
+    if (!firstToken || !reserves || !pairTokens) return "0.000000"
     
-    // Mock balance - in real app, this would come from contract queries
-    const mockBalance = firstToken.symbol === "ETH" ? 1.45 : 2500.00
-    return ((mockBalance * withdrawPercentage) / 100).toFixed(6)
-  }, [firstToken, withdrawPercentage])
+    // Determine which reserve corresponds to first token by comparing addresses
+    const isFirstTokenToken0 = pairTokens.token0.toLowerCase() === firstToken.tokenAddress.toString().toLowerCase()
+    const amount = isFirstTokenToken0 ? withdrawalAmounts.amount0 : withdrawalAmounts.amount1
+    return formatTokenAmount(amount, firstToken.decimals, 6)
+  }, [firstToken, pairTokens, withdrawalAmounts])
 
   const estimatedSecondTokenAmount = useMemo(() => {
-    if (!secondToken) return "0.00"
+    if (!secondToken || !reserves || !pairTokens) return "0.000000"
     
-    // Mock balance - in real app, this would come from contract queries
-    const mockBalance = secondToken.symbol === "USDC" ? 2500.00 : 1.45
-    return ((mockBalance * withdrawPercentage) / 100).toFixed(2)
-  }, [secondToken, withdrawPercentage])
+    // Determine which reserve corresponds to second token by comparing addresses
+    const isSecondTokenToken0 = pairTokens.token0.toLowerCase() === secondToken.tokenAddress.toString().toLowerCase()
+    const amount = isSecondTokenToken0 ? withdrawalAmounts.amount0 : withdrawalAmounts.amount1
+    return formatTokenAmount(amount, secondToken.decimals, 6)
+  }, [secondToken, pairTokens, withdrawalAmounts])
 
   return {
     withdrawPercentage,
@@ -76,5 +164,7 @@ export function useWithdrawal({
     estimatedFirstTokenAmount,
     estimatedSecondTokenAmount,
     lpToken,
+    isLoading,
+    error,
   }
 } 

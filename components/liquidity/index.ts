@@ -6,6 +6,7 @@ export { LoadingState } from "./loading-state"
 // UI components
 export { TokenInput } from "./token-input"
 export { TokenSelector } from "./token-selector"
+export { TokenPairSelector } from "./token-pair-selector"
 export { QuoteDisplay } from "./quote-display"
 export { ExchangeRateDisplay } from "./exchange-rate-display"
 export { LPTokenInfo } from "./lp-token-info"

@@ -1,0 +1,92 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# TanStack Form Usage Rules (Context7)
+
+## Overview
+TanStack Form is the standard for all form state management and validation in this codebase. Follow these rules for consistent, type-safe, and maintainable form handling.
+
+## Key Principles
+- Use TanStack Form for all forms, including UI, validation, and submission logic
+- Co-locate form logic with feature logic (see [Project Structure Guidelines](mdc:structure.mdc))
+- Always use TypeScript with strict types for form values and validation
+- Integrate with Zod for schema validation
+- Reference: [TanStack Form Context7](mdc:https:/context7.com/tanstack/tanstack.com/form)
+
+## File & Directory Organization
+- Place form hooks/components in `components/forms/` or feature-specific directories
+- Name files and exports by feature: `login-form.tsx`, `useLoginForm.ts`
+- Co-locate tests with form files using `.test.tsx` suffix
+
+## Naming Conventions
+- Form hooks: Prefix with `use`, e.g., `useLoginForm`, `useProfileForm`
+- Form components: Use PascalCase, e.g., `LoginForm`, `ProfileForm`
+- See [naming.mdc](mdc:naming.mdc) for more
+
+## Usage Patterns
+### Basic Form Setup
+```typescript
+import { useForm } from '@tanstack/react-form';
+import { z } from 'zod';
+
+const schema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+});
+
+export function useLoginForm(onSubmit: (values: { email: string; password: string }) => void) {
+  return useForm({
+    defaultValues: { email: '', password: '' },
+    onSubmit: async ({ value }) => onSubmit(value),
+    validatorAdapter: zodValidator(schema),
+  });
+}
+```
+
+### Form Component Example
+```typescript
+import { useLoginForm } from './useLoginForm';
+
+export function LoginForm() {
+  const form = useLoginForm(async (values) => {
+    // handle login
+  });
+
+  return (
+    <form onSubmit={form.handleSubmit}>
+      <input {...form.fields.email.getInputProps()} />
+      <input type="password" {...form.fields.password.getInputProps()} />
+      <button type="submit" disabled={form.isSubmitting}>Login</button>
+      {form.error && <div>{form.error}</div>}
+    </form>
+  );
+}
+```
+
+### Validation
+- Use Zod schemas for all validation logic
+- Show validation errors inline with fields
+- Reset dependent fields on input changes as needed
+
+### Integration with TanStack Query
+- Use form submission handlers to trigger TanStack Query mutations
+- Sync query results back to form state as needed
+
+### SSR/Next.js Integration
+- Use React Server Components for static forms
+- Use TanStack Form in Client Components for interactive forms
+- Never manage form state with `useState` or `useEffect`—always use TanStack Form
+
+## Testing
+- Mock form submission and validation in tests
+- Test all validation, error, and success states
+- Co-locate tests with form files
+
+## References
+- [TanStack Form Context7](mdc:https:/context7.com/tanstack/tanstack.com/form)
+- [Best Practices](mdc:best-practices.mdc)
+- [Naming Conventions](mdc:naming.mdc)
+- [Project Structure](mdc:structure.mdc)
+

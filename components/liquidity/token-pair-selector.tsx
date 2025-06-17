@@ -1,6 +1,6 @@
 "use client"
 
-import { ChevronDown, ArrowLeftRight } from "lucide-react"
+import { ChevronDown, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { TokenSelector } from "./token-selector"
 import type { token } from "@/types/token"
@@ -12,7 +12,6 @@ interface TokenPairSelectorProps {
   showTokenList: number | null
   onTokenSelect: (token: token) => void
   onShowTokenList: (tokenIndex: number | null) => void
-  onSwapTokens?: () => void
 }
 
 export function TokenPairSelector({
@@ -22,33 +21,22 @@ export function TokenPairSelector({
   showTokenList,
   onTokenSelect,
   onShowTokenList,
-  onSwapTokens,
 }: TokenPairSelectorProps) {
   return (
     <div className="bg-gray-50 p-4 rounded-lg border">
-      <div className="flex items-center justify-between mb-3">
+      <div className="mb-3">
         <h4 className="text-sm font-medium text-gray-700">Select Token Pair</h4>
-        {onSwapTokens && firstToken && secondToken && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onSwapTokens}
-            className="h-8 w-8 p-0"
-          >
-            <ArrowLeftRight className="h-4 w-4" />
-          </Button>
-        )}
       </div>
       
-      <div className="grid grid-cols-2 gap-3">
+      <div className="space-y-3">
         {/* First Token */}
         <div className="relative">
           <Button
             variant="outline"
-            className="w-full justify-between h-12"
+            className="w-full justify-between h-12 bg-white"
             onClick={() => onShowTokenList(1)}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               {firstToken && (
                 <img
                   src={firstToken.image || "/placeholder.svg"}
@@ -56,9 +44,16 @@ export function TokenPairSelector({
                   className="h-6 w-6 rounded-full"
                 />
               )}
-              <span className="font-medium">
-                {firstToken?.symbol || "Select"}
-              </span>
+              <div className="flex flex-col items-start">
+                <span className="font-medium text-sm">
+                  {firstToken?.symbol || "Select First Token"}
+                </span>
+                {firstToken && (
+                  <span className="text-xs text-gray-500">
+                    {firstToken.name}
+                  </span>
+                )}
+              </div>
             </div>
             <ChevronDown className="h-4 w-4" />
           </Button>
@@ -71,14 +66,21 @@ export function TokenPairSelector({
           />
         </div>
 
+        {/* Plus Icon */}
+        <div className="flex justify-center">
+          <div className="h-8 w-8 bg-gray-200 rounded-full flex items-center justify-center">
+            <Plus className="h-4 w-4 text-gray-600" />
+          </div>
+        </div>
+
         {/* Second Token */}
         <div className="relative">
           <Button
             variant="outline"
-            className="w-full justify-between h-12"
+            className="w-full justify-between h-12 bg-white"
             onClick={() => onShowTokenList(2)}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               {secondToken && (
                 <img
                   src={secondToken.image || "/placeholder.svg"}
@@ -86,9 +88,16 @@ export function TokenPairSelector({
                   className="h-6 w-6 rounded-full"
                 />
               )}
-              <span className="font-medium">
-                {secondToken?.symbol || "Select"}
-              </span>
+              <div className="flex flex-col items-start">
+                <span className="font-medium text-sm">
+                  {secondToken?.symbol || "Select Second Token"}
+                </span>
+                {secondToken && (
+                  <span className="text-xs text-gray-500">
+                    {secondToken.name}
+                  </span>
+                )}
+              </div>
             </div>
             <ChevronDown className="h-4 w-4" />
           </Button>

@@ -1,0 +1,80 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Tailwind CSS Usage Rules (Context7)
+
+## Overview
+Tailwind CSS is the standard for all styling in this codebase. Follow these rules for consistent, maintainable, and accessible UI development.
+
+## Key Principles
+- Use Tailwind utility classes for all styling ([TailwindCSS Context7](mdc:https:/context7.com/tailwindlabs/tailwindcss.com))
+- Prefer semantic HTML and accessibility best practices
+- Use a mobile-first, responsive design approach
+- Customize the theme in `tailwind.config.js` as needed
+
+## File & Directory Organization
+- Place global styles in `styles/globals.css`
+- Place Tailwind config in `tailwind.config.js` and `postcss.config.js`
+- Use utility classes directly in component files
+- Extract repeated patterns to components or Tailwind plugins
+- Use `@apply` in CSS for custom classes when needed
+
+## Naming Conventions
+- Use kebab-case for custom CSS classes
+- Group related Tailwind utility classes in JSX for readability
+- Use meaningful class names for wrappers and layout elements
+- See [naming.mdc](mdc:naming.mdc) for more
+
+## Usage Patterns
+### Basic Usage
+```tsx
+export function ExampleCard() {
+  return (
+    <div className="bg-white rounded-lg shadow p-4 flex flex-col gap-2">
+      <h2 className="text-lg font-bold text-gray-900">Title</h2>
+      <p className="text-gray-600">Description goes here.</p>
+      <button className="btn btn-primary w-full">Action</button>
+    </div>
+  );
+}
+```
+
+### Responsive Design
+- Use responsive prefixes: `sm:`, `md:`, `lg:`, `xl:`
+- Example: `className="p-2 md:p-4 lg:p-6"`
+
+### Custom Classes with @apply
+```css
+/* styles/components/card.css */
+.card {
+  @apply bg-white rounded-lg shadow p-4;
+}
+```
+
+### Accessibility
+- Use semantic HTML elements (e.g., `<button>`, `<nav>`, `<main>`)
+- Add ARIA attributes as needed
+- Ensure color contrast meets WCAG standards
+
+### Theming & Customization
+- Customize colors, fonts, and spacing in `tailwind.config.js`
+- Use Tailwind plugins for additional utilities
+- Use `dark:` prefix for dark mode support
+
+### Integration with shadcn/ui
+- Use Tailwind classes to customize shadcn/ui components
+- Prefer composition and slot-based APIs for flexibility
+
+## Testing
+- Test UI on multiple device sizes
+- Use Playwright for E2E visual regression
+- Check accessibility with tools like axe or Lighthouse
+
+## References
+- [TailwindCSS Context7](mdc:https:/context7.com/tailwindlabs/tailwindcss.com)
+- [Best Practices](mdc:best-practices.mdc)
+- [Naming Conventions](mdc:naming.mdc)
+- [Project Structure](mdc:structure.mdc)
+

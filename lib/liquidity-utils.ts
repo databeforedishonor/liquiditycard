@@ -93,4 +93,49 @@ export function calculateExchangeRate(
 export function hasLPTokens(lpTokenBalance: string): boolean {
   const balance = parseFloat(lpTokenBalance || "0")
   return balance > 0 && !isNaN(balance)
+}
+
+/**
+ * Calculate withdrawal amounts based on LP token balance and percentage
+ * Uses the proportional share formula: userShare = (userLPBalance / totalSupply) * reserve
+ */
+export function calculateWithdrawalAmounts(
+  lpTokenBalance: string,
+  totalSupply: string,
+  reserve0: string,
+  reserve1: string,
+  withdrawalPercentage: number
+): { amount0: string; amount1: string } {
+  try {
+    const lpBalanceBigInt = BigInt(lpTokenBalance)
+    const totalSupplyBigInt = BigInt(totalSupply)
+    const reserve0BigInt = BigInt(reserve0)
+    const reserve1BigInt = BigInt(reserve1)
+    
+    // Calculate withdrawal amount of LP tokens (percentage of user's balance)
+    const withdrawalAmount = (lpBalanceBigInt * BigInt(withdrawalPercentage)) / BigInt(100)
+    
+    // Calculate proportional amounts of underlying tokens
+    // amount = (withdrawalLPAmount * reserve) / totalSupply
+    const amount0 = (withdrawalAmount * reserve0BigInt) / totalSupplyBigInt
+    const amount1 = (withdrawalAmount * reserve1BigInt) / totalSupplyBigInt
+    
+    return {
+      amount0: amount0.toString(),
+      amount1: amount1.toString()
+    }
+  } catch (error) {
+    console.error('Error calculating withdrawal amounts:', error)
+    return {
+      amount0: "0",
+      amount1: "0"
+    }
+  }
+}
+
+/**
+ * Format LP token balance for display (LP tokens have 18 decimals)
+ */
+export function formatLPTokenBalance(balance: string): string {
+  return formatTokenAmount(balance, 18, 8)
 } 

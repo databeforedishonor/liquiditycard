@@ -1,0 +1,99 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Best Practices (Context7-aligned)
+
+## Development Workflow
+
+### Version Control
+- Use feature branches and atomic, conventional commits.
+- Pull request reviews are mandatory for all merges.
+
+
+## Next.js
+- Use the App Router and file-based routing.
+- Prefer Server Components for static/non-interactive UI.
+- Use Client Components only for interactivity or browser APIs.
+- Fetch data in Server Components using async/await.
+- Use `generateMetadata` for SEO.
+- Implement loading and error UI with `loading.tsx` and `error.tsx`.
+- Use environment variables via `.env.local` and `process.env`.
+- Structure routes with route groups and co-locate components.
+- Use dynamic imports for non-critical client code.
+- Use server actions for backend logic
+
+## React
+- Use functional components and hooks ([React Context7](mdc:https:/context7.com/reactjs/react.dev)).
+- Prefer composition over inheritance.
+- Use custom hooks for reusable logic.
+- Use strict typing with TypeScript.
+- Memoize expensive computations with `useMemo` and `useCallback`.
+- Use error boundaries for robust error handling.
+
+## TailwindCSS
+- Use utility-first classes for all styling ([TailwindCSS Context7](mdc:https:/context7.com/tailwindlabs/tailwindcss.com)).
+- Group related classes for readability.
+- Use responsive prefixes (`sm:`, `md:`, etc.) for mobile-first design.
+- Extract repeated patterns to components or Tailwind plugins.
+- Use `@apply` in CSS for custom classes when needed.
+- Prefer semantic HTML and accessibility best practices.
+
+## shadcn/ui
+- Use shadcn/ui for accessible, themeable UI primitives ([shadcn/ui Context7](mdc:https:/context7.com/shadcn-ui/ui)).
+- Customize components via props and Tailwind classes.
+- Use the CLI to scaffold and update components.
+- Prefer composition and slot-based APIs for flexibility.
+- Follow accessibility guidance in shadcn/ui docs.
+
+## TanStack Query
+- Use TanStack Query for all server state management ([TanStack Context7](mdc:https:/context7.com/tanstack/tanstack.com)).
+- Co-locate queries and mutations with feature logic.
+- Use query keys for cache control and invalidation.
+- Prefer `useQuery` for reads, `useMutation` for writes.
+- Handle loading, error, and empty states in UI.
+- Use optimistic updates for fast UX.
+
+## Turso & Drizzle ORM
+- Use Drizzle ORM for type-safe SQL and migrations.
+- Store schema in `db/schema/` and queries in `db/queries/`.
+- Use Turso for scalable, distributed SQLite.
+- Validate all inputs and outputs with Zod.
+- Use environment variables for DB credentials.
+- Run migrations in CI/CD before deploy.
+
+## UI/UX Patterns
+- Design mobile-first, test on multiple device sizes.
+- Use semantic HTML and ARIA attributes.
+- Ensure color contrast and keyboard navigation.
+- Implement skeleton loaders and loading indicators.
+- Avoid layout shifts and use suspense boundaries.
+
+## Performance
+- Use code splitting and dynamic imports.
+- Optimize images and fonts.
+- Memoize components and hooks.
+- Use virtualization for large lists.
+- Monitor and improve Core Web Vitals.
+
+## Security
+- Sanitize all user input.
+- Use HTTPS for all communications.
+- Store secrets in environment variables.
+- Implement proper authentication and authorization.
+
+## Code Organization
+- Use feature-based directory structure.
+- Co-locate tests with implementation.
+- Use barrel files (`index.ts`) for clean imports.
+- Extract reusable logic to hooks and utils.
+
+---
+
+**References:**
+- [Next.js Context7](mdc:https:/context7.com/vercel/next.js)
+- [React Context7](mdc:https:/context7.com/reactjs/react.dev)
+- [TailwindCSS Context7](mdc:https:/context7.com/tailwindlabs/tailwindcss.com)
+- [shadcn/ui Context7](mdc:https:/context7.com/shadcn-ui/ui)
+- [TanStack Context7](mdc:https:/context7.com/tanstack/tanstack.com)

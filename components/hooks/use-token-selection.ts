@@ -39,6 +39,7 @@ interface UseTokenSelectionReturn {
   handleTokenSelect: (selectedToken: token) => void
   setFirstTokenAmount: (amount: string) => void
   setSecondTokenAmount: (amount: string) => void
+  swapTokens: () => void
 }
 
 export function useTokenSelection(): UseTokenSelectionReturn {
@@ -252,6 +253,20 @@ export function useTokenSelection(): UseTokenSelectionReturn {
     setShowTokenList(null)
   }
 
+  const swapTokens = () => {
+    if (firstToken && secondToken) {
+      // Swap the tokens
+      const tempToken = firstToken
+      setFirstToken(secondToken)
+      setSecondToken(tempToken)
+      
+      // Swap the amounts as well
+      const tempAmount = firstTokenAmount
+      setFirstTokenAmount(secondTokenAmount)
+      setSecondTokenAmount(tempAmount)
+    }
+  }
+
   return {
     firstToken: updatedFirstToken,
     secondToken: updatedSecondToken,
@@ -281,5 +296,6 @@ export function useTokenSelection(): UseTokenSelectionReturn {
     handleTokenSelect,
     setFirstTokenAmount,
     setSecondTokenAmount,
+    swapTokens,
   }
 } 
