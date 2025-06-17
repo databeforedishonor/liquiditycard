@@ -1,5 +1,5 @@
 import { TOKEN_CONSTANTS } from "./token-constants"
-import type { TokenDisplayInfo, LPTokenInfo } from "@/types/liquidity"
+import type { TokenDisplayInfo } from "@/types/liquidity"
 
 /**
  * Find token information by address from TOKEN_CONSTANTS

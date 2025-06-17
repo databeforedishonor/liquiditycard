@@ -1,6 +1,6 @@
 "use client"
 
-import { useWallet, WalletButton } from "@vechain/dapp-kit-react"
+import {  WalletButton } from "@vechain/dapp-kit-react"
 
 export function Header() {
   return (

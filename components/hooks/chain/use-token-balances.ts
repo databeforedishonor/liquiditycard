@@ -40,26 +40,22 @@ export function useTokenBalance({
         return "0";
       }
 
-      const executeBalanceQuery = async () => {
-        // Create contract instance for the token
-        const contract = thor.contracts.load(tokenAddress, ERC20_ABI);
+      // Create contract instance for the token
+      const contract = thor.contracts.load(tokenAddress, ERC20_ABI);
 
-        // Execute balance query
-        const result = await contract.read.balanceOf(userAddress);
+      // Execute balance query
+      const result = await contract.read.balanceOf(userAddress);
 
-        // Process result
-        let processedBalance = "0";
-        
-        if (Array.isArray(result) && result.length > 0) {
-          processedBalance = result[0] ? result[0].toString() : "0";
-        } else if (result) {
-          processedBalance = result.toString();
-        
- 
-        return processedBalance;
-      };
-        return executeBalanceQuery();
+      // Process result
+      let processedBalance = "0";
+      
+      if (Array.isArray(result) && result.length > 0) {
+        processedBalance = result[0] ? result[0].toString() : "0";
+      } else if (result) {
+        processedBalance = result.toString();
       }
+
+      return processedBalance;
     },
     enabled: Boolean(thor && userAddress && tokenAddress && enabled),
     staleTime: 30 * 1000, // 30 seconds
@@ -76,10 +72,8 @@ export function useTokenBalance({
 
 export function useAllTokenBalances({
   userAddress,
-  debug = false,
 }: {
   userAddress: string;
-  debug?: boolean;
 }): AllTokenBalancesResult {
   const thor = useThor();
 
@@ -134,7 +128,7 @@ export function useAllTokenBalances({
 
             balanceMap[tokenAddress] = balance;
             
-          } catch (decodeError) {
+          } catch {
             balanceMap[tokenAddress] = "0";
           }
         });

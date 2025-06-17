@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"
+import { useMemo } from "react"
 import { token } from "../../types/token"
 
 interface UseLiquidityAmountsReturn {

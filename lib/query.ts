@@ -26,7 +26,7 @@ export interface InvalidateQueriesOptions {
 /**
  * Type for query key factory functions
  */
-export type QueryKeyFactory<T extends any[]> = (
+export type QueryKeyFactory<T extends readonly unknown[]> = (
   ...args: T
 ) => readonly string[];
 /**

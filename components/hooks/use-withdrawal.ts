@@ -147,7 +147,7 @@ export function useWithdrawal({
     const isFirstTokenToken0 = pairTokens.token0.toLowerCase() === firstToken.tokenAddress.toString().toLowerCase()
     const amount = isFirstTokenToken0 ? withdrawalAmounts.amount0 : withdrawalAmounts.amount1
     return formatTokenAmount(amount, firstToken.decimals, 6)
-  }, [firstToken, pairTokens, withdrawalAmounts])
+  }, [firstToken, reserves, pairTokens, withdrawalAmounts])
 
   const estimatedSecondTokenAmount = useMemo(() => {
     if (!secondToken || !reserves || !pairTokens) return "0.000000"
@@ -156,7 +156,7 @@ export function useWithdrawal({
     const isSecondTokenToken0 = pairTokens.token0.toLowerCase() === secondToken.tokenAddress.toString().toLowerCase()
     const amount = isSecondTokenToken0 ? withdrawalAmounts.amount0 : withdrawalAmounts.amount1
     return formatTokenAmount(amount, secondToken.decimals, 6)
-  }, [secondToken, pairTokens, withdrawalAmounts])
+  }, [secondToken, reserves, pairTokens, withdrawalAmounts])
 
   return {
     withdrawPercentage,
