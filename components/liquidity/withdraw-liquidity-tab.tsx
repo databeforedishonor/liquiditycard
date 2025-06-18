@@ -7,12 +7,14 @@ import { WithdrawalSlider } from "./withdrawal-slider"
 import { WithdrawalEstimate } from "./withdrawal-estimate"
 import { NoLPTokens } from "./no-lp-tokens"
 import { TokenPairSelector } from "./token-pair-selector"
+import { Button } from "@/components/ui/button"
 import type { token } from "@/types/token"
 import { useGetPairAddress } from "../hooks/chain/use-get-pair-address"
 import { useGetPairTokens } from "../hooks/chain/use-get-pair-tokens"
 import { useLPTokenBalance } from "../hooks/chain/use-lp-token-balance"
 import { usePairReserves } from "../hooks/chain/use-pair-reserves"
 import { usePairTotalSupply } from "../hooks/chain/use-pair-total-supply"
+import { useWithdrawLiquidityTransaction } from "../hooks/use-withdraw-liquidity-transaction"
 import { 
   calculateWithdrawalAmounts, 
   formatLPTokenBalance, 
@@ -21,6 +23,7 @@ import {
   calculateExchangeRate
 } from "@/lib/liquidity-utils"
 import { TOKEN_CONSTANTS, createTokenFromConstant } from "@/lib/token-constants"
+import { Balance } from "@/types/balance"
 
 /**
  * Helper function to convert VET tokens to BVET for pair lookups
@@ -33,6 +36,21 @@ function convertVETToBVETForPairLookup(token: token | null): token | null {
   
   // Return BVET token instead of VET for pair lookups
   return createTokenFromConstant(TOKEN_CONSTANTS.BVET, token.value.toString())
+}
+
+/**
+ * Create Balance object from raw amount string
+ */
+function createBalance(rawAmount: string, decimals: number): Balance {
+  const raw = rawAmount;
+  const divisor = BigInt(10 ** decimals);
+  const formatted = (Number(BigInt(raw)) / Number(divisor)).toFixed(6);
+  
+  return {
+    raw,
+    formatted,
+    decimals
+  };
 }
 
 interface WithdrawLiquidityTabProps {
@@ -61,6 +79,7 @@ export function WithdrawLiquidityTab({
 }: WithdrawLiquidityTabProps) {
   const { account } = useWallet()
   const [withdrawPercentage, setWithdrawPercentage] = useState(50)
+  const [slippage] = useState(2) // 2% default slippage
 
   // Convert VET to BVET for pair lookups
   const firstTokenForPair = convertVETToBVETForPairLookup(firstToken)
@@ -118,6 +137,14 @@ export function WithdrawLiquidityTab({
     Boolean(pairAddress)
   )
 
+  // Withdrawal transaction hook
+  const {
+    withdrawLiquidity,
+    TransactionModal,
+    isLoading: isTransactionLoading,
+    error: transactionError,
+  } = useWithdrawLiquidityTransaction()
+
   // Combine loading states
   const isLoading = isPairLoading || isPairTokensLoading || isLPBalanceLoading || isReservesLoading || isTotalSupplyLoading
 
@@ -127,15 +154,6 @@ export function WithdrawLiquidityTab({
   // Format LP token balance and check if user has tokens
   const formattedLPBalance = formatLPTokenBalance(lpTokenBalance || "0")
   const userHasLPTokens = hasLPTokens(formattedLPBalance)
-
-  // Debug logging
-  console.log('Withdrawal Tab Debug:', {
-    rawBalance: lpTokenBalance,
-    formattedBalance: formattedLPBalance,
-    userHasLPTokens,
-    firstToken: firstToken?.symbol,
-    secondToken: secondToken?.symbol
-  })
 
   // Create LP token info object
   const lpToken = {
@@ -180,6 +198,49 @@ export function WithdrawLiquidityTab({
     estimatedSecondTokenAmount
   )
 
+  // Handle withdrawal submission
+  const handleWithdraw = async () => {
+    if (!firstToken || !secondToken || !pairAddress || !account || !lpTokenBalance || !pairTokens) {
+      console.error("Missing required data for withdrawal")
+      return
+    }
+
+    try {
+      // Calculate LP amount to withdraw
+      const lpAmountToWithdraw = (BigInt(lpTokenBalance) * BigInt(withdrawPercentage)) / BigInt(100)
+      
+      // Create Balance objects for the estimated amounts
+      const token0Amount = createBalance(
+        pairTokens.token0.toLowerCase() === firstTokenForPair?.tokenAddress.toString().toLowerCase() 
+          ? withdrawalAmounts.amount0 
+          : withdrawalAmounts.amount1,
+        firstToken.decimals
+      )
+      
+      const token1Amount = createBalance(
+        pairTokens.token0.toLowerCase() === secondTokenForPair?.tokenAddress.toString().toLowerCase() 
+          ? withdrawalAmounts.amount0 
+          : withdrawalAmounts.amount1,
+        secondToken.decimals
+      )
+
+      const lpAmount = createBalance(lpAmountToWithdraw.toString(), 18)
+
+      await withdrawLiquidity({
+        pairAddress,
+        token0: firstToken,
+        token1: secondToken,
+        token0Amount,
+        token1Amount,
+        lpAmount,
+        slippage,
+        account,
+      })
+    } catch (error) {
+      console.error("Withdrawal failed:", error)
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* Token Pair Selector */}
@@ -207,6 +268,15 @@ export function WithdrawLiquidityTab({
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
           <div className="text-red-800 text-sm">
             <strong>Error loading LP token data:</strong> {error.message}
+          </div>
+        </div>
+      )}
+
+      {/* Transaction Error State */}
+      {transactionError && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="text-red-800 text-sm">
+            <strong>Transaction Error:</strong> {transactionError.message}
           </div>
         </div>
       )}
@@ -252,10 +322,29 @@ export function WithdrawLiquidityTab({
                   </span>
                 </div>
               </div>
+
+              {/* Withdraw Button */}
+              <Button
+                className="w-full bg-rose-600 hover:bg-rose-700 text-white"
+                disabled={
+                  !account || 
+                  withdrawPercentage === 0 || 
+                  isTransactionLoading || 
+                  !pairAddress ||
+                  !lpTokenBalance ||
+                  BigInt(lpTokenBalance) === BigInt(0)
+                }
+                onClick={handleWithdraw}
+              >
+                {isTransactionLoading ? "Processing..." : "Withdraw Liquidity"}
+              </Button>
             </>
           )}
         </>
       )}
+
+      {/* Transaction Modal */}
+      <TransactionModal />
     </div>
   )
 } 

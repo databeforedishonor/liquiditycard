@@ -2,10 +2,9 @@
 
 import { Plus, Minus } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useTokenSelection } from "./hooks/use-token-selection"
-import { useLiquidityAmounts } from "./hooks/use-liquidity-amounts"
 import { useLiquidityActions } from "./hooks/use-liquidity-actions"
 import { AddLiquidityForm } from "./forms/add-liquidity-form"
 import { 
@@ -28,8 +27,6 @@ export default function LiquidityCard() {
     pairTokens,
     isPairTokensLoading,
     pairTokensError,
-    firstTokenAmount,
-    secondTokenAmount,
     reserves,
     isReservesLoading,
     reservesError,
@@ -38,34 +35,20 @@ export default function LiquidityCard() {
     totalSupplyError,
     setShowTokenList,
     handleTokenSelect,
-    setFirstTokenAmount,
-    setSecondTokenAmount,
   } = useTokenSelection()
-
-  // Liquidity amounts hook (for exchange rate and pool share calculations only)
-  const {
-    exchangeRate,
-  } = useLiquidityAmounts({ 
-    firstToken, 
-    secondToken, 
-    firstTokenAmount, 
-    secondTokenAmount 
-  })
 
   // Actions hook
   const {
     mode,
     setMode,
-    handleAddLiquidity,
-    handleWithdrawLiquidity,
   } = useLiquidityActions({
     firstToken,
     secondToken,
-    firstTokenAmount,
-    secondTokenAmount,
-    withdrawPercentage: 0, // Not used anymore
-    estimatedFirstTokenAmount: "", // Not used anymore
-    estimatedSecondTokenAmount: "", // Not used anymore
+    firstTokenAmount: "",
+    secondTokenAmount: "",
+    withdrawPercentage: 0,
+    estimatedFirstTokenAmount: "",
+    estimatedSecondTokenAmount: "",
   })
 
   // Handle switching to add liquidity tab
@@ -118,18 +101,6 @@ export default function LiquidityCard() {
             />
           </TabsContent>
         </CardContent>
-
-        <CardFooter>
-          <TabsContent value="withdraw" className="mt-0 w-full">
-            <Button
-              className="w-full bg-rose-600 hover:bg-rose-700 text-white"
-              disabled={!firstToken || !secondToken}
-              onClick={handleWithdrawLiquidity}
-            >
-              Withdraw Liquidity
-            </Button>
-          </TabsContent>
-        </CardFooter>
       </Tabs>
 
       {/* Pair Information Section */}

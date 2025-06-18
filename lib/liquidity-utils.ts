@@ -11,7 +11,7 @@ export function findTokenByAddress(address: string): TokenDisplayInfo | undefine
 }
 
 /**
- * Format reserve amount using token decimals
+ * Format reserve amount using token decimals (for display)
  */
 export function formatReserve(reserve: string, decimals: number): string {
   try {
@@ -28,7 +28,7 @@ export function formatReserve(reserve: string, decimals: number): string {
 }
 
 /**
- * Format total supply (always 18 decimals for LP tokens)
+ * Format total supply (always 18 decimals for LP tokens, for display)
  */
 export function formatTotalSupply(supply: string): string {
   try {
@@ -45,9 +45,23 @@ export function formatTotalSupply(supply: string): string {
 }
 
 /**
- * Format token amount with specified decimals
+ * Format token amount with specified decimals (for parsing/calculations)
  */
 export function formatTokenAmount(amount: string, decimals: number, displayDecimals = 6): string {
+  try {
+    const amountBigInt = BigInt(amount)
+    const divisor = BigInt(10 ** decimals)
+    const formatted = Number(amountBigInt) / Number(divisor)
+    return formatted.toFixed(displayDecimals)
+  } catch {
+    return amount
+  }
+}
+
+/**
+ * Format token amount for display with locale formatting
+ */
+export function formatTokenAmountForDisplay(amount: string, decimals: number, displayDecimals = 6): string {
   try {
     const amountBigInt = BigInt(amount)
     const divisor = BigInt(10 ** decimals)
@@ -137,5 +151,5 @@ export function calculateWithdrawalAmounts(
  * Format LP token balance for display (LP tokens have 18 decimals)
  */
 export function formatLPTokenBalance(balance: string): string {
-  return formatTokenAmount(balance, 18, 8)
+  return formatTokenAmount(balance, 18, 12)
 } 
