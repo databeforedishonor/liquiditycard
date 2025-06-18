@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools"
 import { DAppKitProvider } from "@vechain/dapp-kit-react"
 import type { WalletConnectOptions } from "@vechain/dapp-kit-react"
-import { MAINNET_URL } from "@vechain/sdk-network"
+import { MAINNET_URL, TESTNET_URL } from "@vechain/sdk-network"
 import { useState } from "react"
 
 interface ProvidersProps {

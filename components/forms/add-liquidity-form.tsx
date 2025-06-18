@@ -1,31 +1,45 @@
 'use client'
 
 import { useForm, useStore } from '@tanstack/react-form'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { useTokenSelection } from '@/components/hooks/use-token-selection'
-import { useQuote } from '@/components/hooks/chain/use-quote'
+import { useAddLiquidity } from '@/components/hooks/chain/use-add-liquidity'
 import { TokenSelector } from '@/components/liquidity/token-selector'
+import { Balance } from '@/types/balance'
+import { Pair } from '@/types/pair'
+import { createBalanceFromFormatted } from '@/utils/balance/balanceFunctions'
+import { useWallet } from '@vechain/dapp-kit-react'
+import { useAddLiquidityTransaction } from '@/components/hooks/use-add-liquidity-transaction'
 
 // Types for better type safety
 interface AddLiquidityFormValues {
-  firstTokenAmount: number
-  secondTokenAmount: number
+  firstTokenAmount: string
+  secondTokenAmount: string
 }
 
-
-type CalculationType = 'firstToSecond' | 'secondToFirst'
-
-// Helper function to format quote result back to human readable
-const formatQuoteResult = (quote: string, decimals: number): number => {
-  if (!quote || quote === "0") return 0
-  return Number(quote) / Math.pow(10, decimals)
-}
+type LastChangedField = 'token0' | 'token1' | null
 
 export function AddLiquidityForm() {
-  // Track which calculation should be active
-  const [activeCalculation, setActiveCalculation] = useState<CalculationType | null>(null)
-  const [focusedField, setFocusedField] = useState<'firstTokenAmount' | 'secondTokenAmount' | null>(null)
+  // Track which field was last changed for the add liquidity calculation
+  const [lastChangedField, setLastChangedField] = useState<LastChangedField>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Get wallet connection
+  const { account, connect } = useWallet()
+  
+  // Debug wallet state
+  useEffect(() => {
+    console.log('Wallet account state changed:', account);
+  }, [account])
+
+  // Get transaction utilities
+  const {
+    addLiquidity,
+    TransactionModal,
+    isLoading: isTransactionLoading,
+    transactionState,
+  } = useAddLiquidityTransaction()
 
   // Get token selection data
   const {
@@ -33,11 +47,10 @@ export function AddLiquidityForm() {
     secondToken,
     tokens,
     reserves,
-    isReservesLoading,
-    reservesError,
+    totalSupply,
     pairAddress,
-    isTokensLoading,
     pairTokens,
+    isTokensLoading,
     showTokenList,
     setShowTokenList,
     handleTokenSelect,
@@ -45,12 +58,81 @@ export function AddLiquidityForm() {
 
   const form = useForm({
     defaultValues: {
-      firstTokenAmount: 0,
-      secondTokenAmount: 1,
+      firstTokenAmount: '',
+      secondTokenAmount: '',
     } as AddLiquidityFormValues,
     onSubmit: async ({ value }) => {
-      console.log('Form submitted:', value)
+      // Check wallet connection
+      if (!account) {
+        try {
+          console.log('Attempting to connect wallet...');
+          const connectionResult = await connect();
+          console.log('Wallet connection result:', connectionResult);
+          
+          // Give more time for state to update
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Check again after connection attempt
+          if (!account) {
+            console.log('Wallet connected but account state not updated yet. Please try submitting again.');
+            return;
+          }
+        } catch (error) {
+          console.error('Failed to connect wallet:', error);
+          return;
+        }
+      }
+
+      if (!firstToken || !secondToken || !value.firstTokenAmount || !value.secondTokenAmount) {
+        console.error('Missing required data for transaction')
+        return
+      }
+
+      // Validate amounts are valid numbers
+      const firstAmount = parseFloat(value.firstTokenAmount)
+      const secondAmount = parseFloat(value.secondTokenAmount)
       
+      if (isNaN(firstAmount) || isNaN(secondAmount) || firstAmount <= 0 || secondAmount <= 0) {
+        console.error('Invalid token amounts')
+        return
+      }
+
+      setIsSubmitting(true)
+      try {
+        // Create Balance objects from form values
+        console.log('Creating balances:', {
+          firstTokenAmount: value.firstTokenAmount,
+          firstTokenDecimals: firstToken.decimals,
+          secondTokenAmount: value.secondTokenAmount,
+          secondTokenDecimals: secondToken.decimals
+        })
+        
+        const amountA = createBalanceFromFormatted(value.firstTokenAmount, firstToken.decimals)
+        const amountB = createBalanceFromFormatted(value.secondTokenAmount, secondToken.decimals)
+        
+        console.log('Created balances:', { amountA, amountB })
+
+        // Build transaction parameters using the correct interface
+        const txParams = {
+          tokenA: firstToken,
+          tokenB: secondToken,
+          amountA,
+          amountB,
+          slippage: 0.5, // 0.5% slippage tolerance - you might want to make this configurable
+          account: account || '', // Ensure account is not null
+        }
+
+        await addLiquidity(txParams)
+        
+        // Reset form on success (transaction modal will handle success state)
+        form.reset()
+        setLastChangedField(null)
+        
+      } catch (error) {
+        console.error('Transaction failed:', error)
+      } finally {
+        setIsSubmitting(false)
+      }
     },
   })
 
@@ -66,73 +148,119 @@ export function AddLiquidityForm() {
     errors: state.errorMap,
   }))
 
-  // Determine token ordering in the pair
-  const isFirstTokenToken0 = firstToken && pairTokens ? 
-    firstToken.tokenAddress.toString().toLowerCase() === pairTokens.token0.toLowerCase() : false
-  const isSecondTokenToken0 = secondToken && pairTokens ? 
-    secondToken.tokenAddress.toString().toLowerCase() === pairTokens.token0.toLowerCase() : false
+  // Create Pair object from current data with correct token ordering
+  const pair: Pair | null = useMemo(() => {
+    if (!pairAddress || !firstToken || !secondToken || !reserves || !totalSupply || !pairTokens) {
+      return null
+    }
 
-  // Quote for first token -> second token
-  const firstToSecondQuote = useQuote({
-    inputAmountA: firstTokenAmount.toString(),
-    reserveA: isFirstTokenToken0 ? (reserves?.reserve0 || "0") : (reserves?.reserve1 || "0"),
-    reserveB: isSecondTokenToken0 ? (reserves?.reserve0 || "0") : (reserves?.reserve1 || "0"),
-    enabled: activeCalculation === 'firstToSecond' && Boolean(reserves && firstToken && secondToken && typeof firstTokenAmount === 'number'),
+    // Determine which selected token corresponds to token0 and token1 from the pair contract
+    const isFirstTokenToken0 = firstToken.tokenAddress.toString().toLowerCase() === pairTokens.token0.toLowerCase()
+    const token0 = isFirstTokenToken0 ? firstToken : secondToken
+    const token1 = isFirstTokenToken0 ? secondToken : firstToken
+
+    return {
+      pairAddress,
+      token0,
+      token1,
+      reserve0: {
+        raw: reserves.reserve0,
+        formatted: (Number(reserves.reserve0) / Math.pow(10, token0.decimals)).toFixed(6),
+        decimals: token0.decimals
+      },
+      reserve1: {
+        raw: reserves.reserve1,
+        formatted: (Number(reserves.reserve1) / Math.pow(10, token1.decimals)).toFixed(6),
+        decimals: token1.decimals
+      },
+      totalSupply: {
+        raw: totalSupply,
+        formatted: (Number(totalSupply) / Math.pow(10, 18)).toFixed(6), // LP tokens have 18 decimals
+        decimals: 18
+      }
+    }
+  }, [pairAddress, firstToken, secondToken, reserves, totalSupply, pairTokens])
+
+  // Convert form amounts to Balance objects with correct token ordering
+  const token0Amount: Balance | null = useMemo(() => {
+    if (!pairTokens || !firstToken || !secondToken) return null
+    
+    const isFirstTokenToken0 = firstToken.tokenAddress.toString().toLowerCase() === pairTokens.token0.toLowerCase()
+    const amount = isFirstTokenToken0 ? firstTokenAmount : secondTokenAmount
+    const token = isFirstTokenToken0 ? firstToken : secondToken
+    
+    if (!amount || !token) return null
+    return createBalanceFromFormatted(amount, token.decimals)
+  }, [firstTokenAmount, secondTokenAmount, firstToken, secondToken, pairTokens])
+
+  const token1Amount: Balance | null = useMemo(() => {
+    if (!pairTokens || !firstToken || !secondToken) return null
+    
+    const isFirstTokenToken0 = firstToken.tokenAddress.toString().toLowerCase() === pairTokens.token0.toLowerCase()
+    const amount = isFirstTokenToken0 ? secondTokenAmount : firstTokenAmount
+    const token = isFirstTokenToken0 ? secondToken : firstToken
+    
+    if (!amount || !token) return null
+    return createBalanceFromFormatted(amount, token.decimals)
+  }, [firstTokenAmount, secondTokenAmount, firstToken, secondToken, pairTokens])
+
+  // Map lastChangedField to correct token ordering
+  const mappedLastChangedField = useMemo(() => {
+    if (!lastChangedField || !pairTokens || !firstToken || !secondToken) return null
+    
+    const isFirstTokenToken0 = firstToken.tokenAddress.toString().toLowerCase() === pairTokens.token0.toLowerCase()
+    
+    if (lastChangedField === 'token0') {
+      return isFirstTokenToken0 ? 'token0' : 'token1'
+    } else {
+      return isFirstTokenToken0 ? 'token1' : 'token0'
+    }
+  }, [lastChangedField, pairTokens, firstToken, secondToken])
+
+  // Use the refactored add liquidity hook
+  const addLiquidityResult = useAddLiquidity({
+    pair,
+    token0: pair?.token0 || null,
+    token0Amount,
+    token1: pair?.token1 || null,
+    token1Amount,
+    lastChangedField: mappedLastChangedField,
+    onSuccess: (result) => {
+      if (result && pairTokens && firstToken && secondToken) {
+        const isFirstTokenToken0 = firstToken.tokenAddress.toString().toLowerCase() === pairTokens.token0.toLowerCase()
+        
+        // Update form with calculated amounts based on correct token mapping
+        if (mappedLastChangedField === 'token0' && result.token1) {
+          const targetField = isFirstTokenToken0 ? 'secondTokenAmount' : 'firstTokenAmount'
+          form.setFieldValue(targetField, result.token1.formatted)
+        } else if (mappedLastChangedField === 'token1' && result.token0) {
+          const targetField = isFirstTokenToken0 ? 'firstTokenAmount' : 'secondTokenAmount'
+          form.setFieldValue(targetField, result.token0.formatted)
+        }
+      }
+    }
   })
 
-  // Quote for second token -> first token
-  const secondToFirstQuote = useQuote({
-    inputAmountA: secondTokenAmount.toString(),
-    reserveA: isSecondTokenToken0 ? (reserves?.reserve0 || "0") : (reserves?.reserve1 || "0"),
-    reserveB: isFirstTokenToken0 ? (reserves?.reserve0 || "0") : (reserves?.reserve1 || "0"),
-    enabled: activeCalculation === 'secondToFirst' && Boolean(reserves && firstToken && secondToken && typeof secondTokenAmount === 'number'),
-  })
+  const isCalculating = addLiquidityResult.isLoading
 
-  // ✅ useStore for conditional logic
-  const isCalculating = activeCalculation === 'firstToSecond' ? firstToSecondQuote.isLoading : 
-                       activeCalculation === 'secondToFirst' ? secondToFirstQuote.isLoading : 
-                       false
-
-  // ✅ useStore for validation logic - now checks if we have valid quote data
+  // ✅ useStore for validation logic
   const isValidRelationship = useStore(form.store, (state) => {
-    // Valid if we have both tokens and either both fields have values or we're not actively calculating
-    return Boolean(firstToken && secondToken && 
-      (state.values.firstTokenAmount > 0 || state.values.secondTokenAmount > 0) &&
-      !isCalculating)
+    const hasFirstAmount = state.values.firstTokenAmount && parseFloat(state.values.firstTokenAmount) > 0
+    const hasSecondAmount = state.values.secondTokenAmount && parseFloat(state.values.secondTokenAmount) > 0
+    return Boolean(firstToken && secondToken && (hasFirstAmount || hasSecondAmount) && !isCalculating)
   })
 
-  // Helper function for handling calculations using quotes
-  const handleCalculation = (
-    type: CalculationType,
-    targetField: keyof AddLiquidityFormValues
-  ) => {
-    setActiveCalculation(type)
-    console.log(`Starting ${type} calculation for ${targetField}`)
-  }
-
-  // Handle quote results using useEffect to avoid setState during render
+  // Clear amounts when tokens change
   useEffect(() => {
-    if (activeCalculation === 'firstToSecond' && !firstToSecondQuote.isLoading && firstToSecondQuote.quote && secondToken) {
-      const result = formatQuoteResult(firstToSecondQuote.quote, secondToken.decimals)
-      form.setFieldValue('secondTokenAmount', result)
-      console.log(`Updated secondTokenAmount to quote result: ${result}`)
-      setActiveCalculation(null)
-    }
-  }, [activeCalculation, firstToSecondQuote.isLoading, firstToSecondQuote.quote, secondToken, form])
-
-  useEffect(() => {
-    if (activeCalculation === 'secondToFirst' && !secondToFirstQuote.isLoading && secondToFirstQuote.quote && firstToken) {
-      const result = formatQuoteResult(secondToFirstQuote.quote, firstToken.decimals)
-      form.setFieldValue('firstTokenAmount', result)
-      console.log(`Updated firstTokenAmount to quote result: ${result}`)
-      setActiveCalculation(null)
-    }
-  }, [activeCalculation, secondToFirstQuote.isLoading, secondToFirstQuote.quote, firstToken, form])
+    form.setFieldValue('firstTokenAmount', '')
+    form.setFieldValue('secondTokenAmount', '')
+    setLastChangedField(null)
+  }, [firstToken?.tokenAddress, secondToken?.tokenAddress, form])
 
   // Clear form amounts when tokens change
   useEffect(() => {
-    form.setFieldValue('firstTokenAmount', 0)
-    form.setFieldValue('secondTokenAmount', 0)
+    form.setFieldValue('firstTokenAmount', '')
+    form.setFieldValue('secondTokenAmount', '')
     console.log('Cleared form amounts due to token change')
   }, [firstToken?.tokenAddress, secondToken?.tokenAddress, form])
 
@@ -192,23 +320,21 @@ export function AddLiquidityForm() {
           name="firstTokenAmount"
           validators={{
             onChange: ({ value }) => {
-              if (typeof value !== 'number' || isNaN(value)) {
+              if (!value) return undefined
+              const numValue = parseFloat(value)
+              if (isNaN(numValue)) {
                 return 'Must be a valid number'
               }
-              if (value < 0) {
+              if (numValue < 0) {
                 return 'Must be positive'
               }
               return undefined
             },
           }}
           listeners={{
-            onChange: async ({ value, fieldApi }) => {
-              console.log(`First token amount changed to: ${value}`)
-              
-              // Only trigger calculation if this field is currently focused
-              if (focusedField === 'firstTokenAmount') {
-                console.log('First field is focused, updating second token amount')
-                handleCalculation('firstToSecond', 'secondTokenAmount')
+            onChange: ({ value }) => {
+              if (value && parseFloat(value) > 0) {
+                setLastChangedField('token0')
               }
             },
           }}
@@ -219,16 +345,19 @@ export function AddLiquidityForm() {
                 Amount ({firstToken?.symbol || 'Token'})
               </label>
               <input
-                type="number"
-                value={field.state.value.toString()}
-                onChange={(e) => field.handleChange(Number(e.target.value) || 0)}
-                onFocus={() => setFocusedField('firstTokenAmount')}
-                onBlur={(e) => {
-                  field.handleBlur()
-                  setFocusedField(null)
+                type="text"
+                inputMode="decimal"
+                value={field.state.value}
+                onChange={(e) => {
+                  const value = e.target.value
+                  // Only allow numbers and decimal point
+                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                    field.handleChange(value)
+                  }
                 }}
+                onBlur={field.handleBlur}
                 placeholder={`Enter ${firstToken?.symbol || 'token'} amount`}
-                disabled={activeCalculation === 'secondToFirst'}
+                disabled={isCalculating && lastChangedField === 'token1'}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               {!field.state.meta.isValid && (
@@ -294,23 +423,21 @@ export function AddLiquidityForm() {
           name="secondTokenAmount"
           validators={{
             onChange: ({ value }) => {
-              if (typeof value !== 'number' || isNaN(value)) {
+              if (!value) return undefined
+              const numValue = parseFloat(value)
+              if (isNaN(numValue)) {
                 return 'Must be a valid number'
               }
-              if (value < 0) {
+              if (numValue < 0) {
                 return 'Must be positive'
               }
               return undefined
             },
           }}
           listeners={{
-            onChange: async ({ value, fieldApi }) => {
-              console.log(`Second token amount changed to: ${value}`)
-              
-              // Only trigger calculation if this field is currently focused
-              if (focusedField === 'secondTokenAmount') {
-                console.log('Second field is focused, updating first token amount')
-                handleCalculation('secondToFirst', 'firstTokenAmount')
+            onChange: ({ value }) => {
+              if (value && parseFloat(value) > 0) {
+                setLastChangedField('token1')
               }
             },
           }}
@@ -321,16 +448,19 @@ export function AddLiquidityForm() {
                 Amount ({secondToken?.symbol || 'Token'})
               </label>
               <input
-                type="number"
-                value={field.state.value.toString()}
-                onChange={(e) => field.handleChange(Number(e.target.value) || 0)}
-                onFocus={() => setFocusedField('secondTokenAmount')}
-                onBlur={(e) => {
-                  field.handleBlur()
-                  setFocusedField(null)
+                type="text"
+                inputMode="decimal"
+                value={field.state.value}
+                onChange={(e) => {
+                  const value = e.target.value
+                  // Only allow numbers and decimal point
+                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                    field.handleChange(value)
+                  }
                 }}
+                onBlur={field.handleBlur}
                 placeholder={`Enter ${secondToken?.symbol || 'token'} amount`}
-                disabled={activeCalculation === 'firstToSecond'}
+                disabled={isCalculating && lastChangedField === 'token0'}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               {!field.state.meta.isValid && (
@@ -349,12 +479,12 @@ export function AddLiquidityForm() {
             <div className="mt-1 space-y-1">
               {isCalculating && (
                 <div className="text-blue-600">
-                  🔄 Calculating {activeCalculation === 'firstToSecond' ? 'second token' : 'first token'} amount...
+                  🔄 Calculating optimal amounts...
                 </div>
               )}
               {!isValidRelationship && !isCalculating && (
                 <div className="text-amber-600">
-                  ⚠️ Enter token amounts to see DEX quotes
+                  ⚠️ Enter token amounts to calculate liquidity
                 </div>
               )}
             </div>
@@ -369,11 +499,7 @@ export function AddLiquidityForm() {
               Pair: {pairAddress.slice(0, 10)}...
             </div>
             
-            {isReservesLoading ? (
-              <div className="text-green-600">🔄 Loading reserves...</div>
-            ) : reservesError ? (
-              <div className="text-red-600">❌ Error loading reserves: {reservesError.message}</div>
-            ) : reserves ? (
+            {reserves ? (
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div>
                   <span className="font-medium">Reserve 0:</span>
@@ -414,16 +540,31 @@ export function AddLiquidityForm() {
         {/* Submit Button with comprehensive state handling */}
         <Button
           type="submit"
-          disabled={!formState.canSubmit || formState.isSubmitting || !isValidRelationship || isCalculating}
+          disabled={!account ? false : (!formState.canSubmit || isSubmitting || isTransactionLoading || !isValidRelationship || isCalculating)}
           className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+          onClick={() => {
+            console.log('Button clicked. Wallet state:', { 
+              account, 
+              hasAccount: !!account,
+              canSubmit: formState.canSubmit,
+              isSubmitting,
+              isTransactionLoading,
+              isValidRelationship,
+              isCalculating 
+            });
+          }}
         >
-          {formState.isSubmitting ? 'Submitting...' : 
+          {!account ? 'Connect Wallet' :
+           isSubmitting || isTransactionLoading ? 'Submitting Transaction...' :
            isCalculating ? 'Calculating...' :
            isTokensLoading ? 'Loading...' :
            !pairAddress ? 'No Pair Available' :
            !isValidRelationship ? 'Enter Amounts' :
            'Add Liquidity'}
         </Button>
+
+        {/* Transaction Modal */}
+        <TransactionModal />
 
         {/* Form Errors Display */}
         {Object.keys(formState.errors).length > 0 && (

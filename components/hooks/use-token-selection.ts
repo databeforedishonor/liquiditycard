@@ -10,6 +10,19 @@ import { usePairTotalSupply } from "./chain/use-pair-total-supply"
 import { AVAILABLE_TOKENS, TOKEN_CONSTANTS, createTokenFromConstant } from "@/lib/token-constants"
 import { useGetPairTokens } from "./chain/use-get-pair-tokens"
 
+/**
+ * Helper function to convert VET tokens to BVET for pair lookups
+ * Since VET can't be used directly in smart contracts, DEX pairs use BVET instead
+ */
+function convertVETToBVETForPairLookup(token: token | null): token | null {
+  if (!token || token.symbol !== "VET") {
+    return token
+  }
+  
+  // Return BVET token instead of VET for pair lookups
+  return createTokenFromConstant(TOKEN_CONSTANTS.BVET, token.value.toString())
+}
+
 interface UseTokenSelectionReturn {
   firstToken: token | null
   secondToken: token | null
@@ -129,17 +142,20 @@ export function useTokenSelection(): UseTokenSelectionReturn {
     })
   }, [secondToken, allTokenBalances, vetBalance])
 
-  // Get pair address when both tokens are not null
+  // Convert VET to BVET for pair lookups
+  const firstTokenForPair = convertVETToBVETForPairLookup(updatedFirstToken)
+  const secondTokenForPair = convertVETToBVETForPairLookup(updatedSecondToken)
+
+  // Get pair address when both tokens are not null (using BVET instead of VET)
   const {
     pairAddress,
     isLoading: isPairLoading,
     error: pairError,
   } = useGetPairAddress(
-    updatedFirstToken?.tokenAddress.toString() || "",
-    updatedSecondToken?.tokenAddress.toString() || "",
-    Boolean(updatedFirstToken && updatedSecondToken)
+    firstTokenForPair?.tokenAddress.toString() || "",
+    secondTokenForPair?.tokenAddress.toString() || "",
+    Boolean(firstTokenForPair && secondTokenForPair)
   )
-
 
   // Get pair tokens when we have a pair address
   const {

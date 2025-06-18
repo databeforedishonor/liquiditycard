@@ -6,9 +6,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useTokenSelection } from "./hooks/use-token-selection"
 import { useLiquidityAmounts } from "./hooks/use-liquidity-amounts"
-import { useWithdrawal } from "./hooks/use-withdrawal"
 import { useLiquidityActions } from "./hooks/use-liquidity-actions"
-import { hasLPTokens } from "@/lib/liquidity-utils"
 import { AddLiquidityForm } from "./forms/add-liquidity-form"
 import { 
   WithdrawLiquidityTab,
@@ -32,9 +30,6 @@ export default function LiquidityCard() {
     pairTokensError,
     firstTokenAmount,
     secondTokenAmount,
-    quote,
-    isQuoteLoading,
-    quoteError,
     reserves,
     isReservesLoading,
     reservesError,
@@ -50,25 +45,12 @@ export default function LiquidityCard() {
   // Liquidity amounts hook (for exchange rate and pool share calculations only)
   const {
     exchangeRate,
-    poolShare,
-    isValidAmounts,
   } = useLiquidityAmounts({ 
     firstToken, 
     secondToken, 
     firstTokenAmount, 
     secondTokenAmount 
   })
-
-  // Withdrawal hook
-  const {
-    withdrawPercentage,
-    setWithdrawPercentage,
-    estimatedFirstTokenAmount,
-    estimatedSecondTokenAmount,
-    lpToken,
-    isLoading: isWithdrawalLoading,
-    error: withdrawalError,
-  } = useWithdrawal({ firstToken, secondToken })
 
   // Actions hook
   const {
@@ -81,13 +63,10 @@ export default function LiquidityCard() {
     secondToken,
     firstTokenAmount,
     secondTokenAmount,
-    withdrawPercentage,
-    estimatedFirstTokenAmount,
-    estimatedSecondTokenAmount,
+    withdrawPercentage: 0, // Not used anymore
+    estimatedFirstTokenAmount: "", // Not used anymore
+    estimatedSecondTokenAmount: "", // Not used anymore
   })
-
-  // Check if user has LP tokens
-  const userHasLPTokens = hasLPTokens(lpToken.balance)
 
   // Handle switching to add liquidity tab
   const handleSwitchToAdd = () => {
@@ -133,14 +112,6 @@ export default function LiquidityCard() {
               secondToken={secondToken}
               tokens={tokens}
               showTokenList={showTokenList}
-              lpToken={lpToken}
-              withdrawPercentage={withdrawPercentage}
-              estimatedFirstTokenAmount={estimatedFirstTokenAmount}
-              estimatedSecondTokenAmount={estimatedSecondTokenAmount}
-              exchangeRate={exchangeRate}
-              isLoading={isWithdrawalLoading}
-              error={withdrawalError}
-              setWithdrawPercentage={setWithdrawPercentage}
               onSwitchToAdd={handleSwitchToAdd}
               onTokenSelect={handleTokenSelect}
               onShowTokenList={setShowTokenList}
@@ -152,10 +123,10 @@ export default function LiquidityCard() {
           <TabsContent value="withdraw" className="mt-0 w-full">
             <Button
               className="w-full bg-rose-600 hover:bg-rose-700 text-white"
-              disabled={!userHasLPTokens || withdrawPercentage === 0 || !firstToken || !secondToken || isWithdrawalLoading || !!withdrawalError}
+              disabled={!firstToken || !secondToken}
               onClick={handleWithdrawLiquidity}
             >
-              {isWithdrawalLoading ? "Loading..." : "Withdraw Liquidity"}
+              Withdraw Liquidity
             </Button>
           </TabsContent>
         </CardFooter>
